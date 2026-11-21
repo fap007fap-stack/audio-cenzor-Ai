@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AI Cenzor — edytor osi czasu</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;background:#090e15;color:#e9f2ff}*{box-sizing:border-box}
+body{margin:0;padding:12px 10px 5px}button,input,select{font:inherit}button{cursor:pointer;border:1px solid #2a3b55;border-radius:9px;background:#152235;color:#dce9ff;padding:8px 12px;font-weight:650}button:hover{background:#233758}button:disabled{opacity:.45;cursor:not-allowed}button.primary{background:#4973f5;border-color:#6389ff;color:white}button.primary:hover{background:#6187ff}button.good{background:#123e3b;color:#99f1db;border-color:#2c887b}.panel{border:1px solid #26364c;border-radius:15px;background:linear-gradient(150deg,#111b29,#0c131d);overflow:hidden;padding:16px 16px 13px;box-shadow:0 14px 40px #0002}
+.title{display:flex;align-items:center;gap:10px;margin-bottom:7px;flex-wrap:wrap}.title h2{font-size:18px;margin:0;letter-spacing:-.02em}.tag{font-size:10px;color:#8eecda;border:1px solid #23695e;background:#12332c;padding:5px 8px;border-radius:30px;letter-spacing:.1em;font-weight:850}.muted{color:#9eb0c7;font-size:12px;line-height:1.6}.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:13px 0}.split{flex:1}.btn-mini{padding:6px 9px;font-size:12px}.counter{font-variant-numeric:tabular-nums;font-weight:750;color:#d5eaff;font-size:12px}.badgecut{background:#5f292e;color:#ffaeae;padding:4px 7px;border-radius:6px;font-size:11px}.badgesil{background:#154945;color:#7df2d5;padding:4px 7px;border-radius:6px;font-size:11px}
+.wave-shell{border:1px solid #2e435e;border-radius:12px;overflow:hidden;background:#060c15}.ruler{border-bottom:1px solid #21364d;height:24px;position:relative;color:#859dbb;font:11px ui-monospace,SFMono-Regular,Consolas,monospace;overflow:hidden}.viewport{position:relative;overflow:auto;scrollbar-color:#465873 #0c1624;scrollbar-width:thin;touch-action:pan-x pan-y}.track{position:relative;height:190px;min-width:100%;cursor:crosshair}.track canvas{position:absolute;inset:0;height:100%;pointer-events:none}.grid{position:absolute;inset:0;pointer-events:none}.regions{position:absolute;inset:0;pointer-events:none}.region{position:absolute;top:13px;height:164px;border:1.5px solid #fc928e;border-radius:4px;background:#ff696a33;pointer-events:auto;cursor:grab;user-select:none;box-shadow:inset 0 0 0 1px #160b10;min-width:4px}.region.silence{border-color:#4fd9c3;background:#44d2be39}.region.inactive{opacity:.32;filter:grayscale(.6)}.region.selected{outline:2px solid #dfeeff;outline-offset:1px;z-index:8;box-shadow:0 0 24px #4973f542}.region:active{cursor:grabbing}.region-label{font-size:11px;font-weight:800;color:#fff;display:inline-block;margin:6px 5px;max-width:calc(100% - 10px);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-shadow:0 1px 4px #000}.handle{position:absolute;width:10px;top:-1px;bottom:-1px;cursor:ew-resize;touch-action:none;border-radius:2px;background:#dbeafea6}.handle.left{left:-4px}.handle.right{right:-4px}.playhead{position:absolute;top:0;bottom:0;width:2px;background:#fff5aa;z-index:11;pointer-events:none;box-shadow:0 0 7px #fff5aa}.playhead:before{content:"";position:absolute;top:0;left:-5px;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid #fff5aa}.legend{display:flex;gap:13px;flex-wrap:wrap;align-items:center;margin:10px 0 5px;font-size:11px;color:#c4d4ec}.dot{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:5px}.selectbox{border:1px solid #2c415c;background:#0c1521;border-radius:12px;padding:13px;margin:11px 0}.select-title{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:11px}.select-title strong{font-size:13px}.fields{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:9px}.field{display:flex;flex-direction:column;gap:5px;color:#98aac0;font-size:11px}.field input,.field select{min-width:0;width:100%;border:1px solid #344763;border-radius:8px;background:#0b1625;color:#ebf5ff;padding:8px 9px;font-size:13px}.field input:focus,.field select:focus{outline:1px solid #6796ff}.switchline{display:flex;align-items:center;gap:14px;margin-top:11px;flex-wrap:wrap}.switchline label{font-size:12px}.switchline input{accent-color:#5684ff}.footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.status{font-size:12px;color:#8ca7c8;line-height:1.4}.status.warn{color:#ffaead}.status.success{color:#83dfc8}.shortcut{padding-top:4px;font-size:11px;color:#7e90a8}.zoom{accent-color:#6997ff;width:95px;vertical-align:middle}.time-mark{position:absolute;top:4px;border-left:1px solid #29415d;padding-left:3px;white-space:nowrap;pointer-events:none}.hidden{display:none!important}@media(max-width:680px){.panel{padding:11px}.fields{grid-template-columns:1fr 1fr}.toolbar{gap:5px}.title h2{font-size:16px}.region{height:156px}.track{height:182px}}
+</style>
+</head>
+<body>
+<div class="panel">
+<div class="title"><span class="tag">TIMELINE EDITOR · V1.7</span><h2>Wszystkie zaznaczenia na jednej ścieżce</h2><span class="split"></span><span class="counter" id="position">00:00.00 / 00:00.00</span></div>
+<div class="muted">Przeciągnij cały kolorowy obszar, żeby przesunąć cięcie. Złap lewą lub prawą krawędź, żeby zmienić jego długość. Odtwarzaj oryginał albo podgląd po wszystkich cięciach.</div>
+<div class="toolbar">
+  <button class="primary" id="playEdited">▶ Odtwarzaj po cięciach</button>
+  <button id="playOriginal">▷ Oryginał</button>
+  <button id="pause">Ⅱ Pauza</button>
+  <button id="stop">■ Stop</button>
+  <span class="split"></span>
+  <button class="btn-mini" id="zoomOut" title="Oddal">−</button><label class="muted" for="zoom">Zoom</label><input id="zoom" type="range" class="zoom" min="1" max="15" value="1" step="1"/><button class="btn-mini" id="zoomIn" title="Przybliż">+</button>
+</div>
+<div class="wave-shell"><div class="ruler" id="ruler"><div id="ticks"></div></div><div class="viewport" id="viewport"><div class="track" id="track"><canvas id="wave"></canvas><div class="regions" id="regions"></div><div class="playhead" id="playhead"></div></div></div></div>
+<div class="legend"><span><i class="dot" style="background:#fc7676"></i>Wytnij</span><span><i class="dot" style="background:#3bd4bd"></i>Wstaw ciszę</span><span><i class="dot" style="background:#63778b"></i>Wyłączone</span><span id="overlaps">0 aktywnych</span></div>
+<div class="toolbar">
+  <button class="btn-mini" id="add">＋ Dodaj zaznaczenie w pozycji kursora</button>
+  <button class="btn-mini" id="audition">▶ Odsłuchaj od zaznaczenia</button>
+  <button class="btn-mini" id="undo">↶ Cofnij</button>
+  <button class="btn-mini" id="remove">✕ Usuń zaznaczenie</button>
+</div>
+<div class="selectbox" id="selection"><div class="select-title"><strong id="selectedTitle">Kliknij zaznaczenie, aby je edytować</strong><span class="muted" id="selectedInfo"></span></div>
+  <div class="fields">
+   <label class="field">Od (s)<input type="number" id="start" step="0.01" min="0"/></label>
+   <label class="field">Do (s)<input type="number" id="end" step="0.01" min="0"/></label>
+   <label class="field">Metoda<select id="method"><option value="Wytnij">Wytnij</option><option value="Wstaw ciszę">Wstaw ciszę</option></select></label>
+   <label class="field">Cisza (s)<input type="number" id="silence" min="0" max="30" step="0.05"/></label>
+  </div><div class="switchline"><label><input type="checkbox" id="active" checked/> Zastosuj to zaznaczenie w eksporcie</label><span class="muted">Początek i koniec można przesuwać również strzałkami (Shift = 0,1 s).</span></div>
+</div>
+<div class="footer"><div><div class="status" id="status">Zmiany w edytorze będą widoczne od razu w podglądzie.</div><div class="shortcut">Spacja: start/pauza · Ctrl+Z: cofnij · Delete: usuń · Kliknięcie osi: przewiń</div></div><button class="good" id="save">✓ Zapisz wszystkie zaznaczenia do eksportu</button></div>
+</div>
+<audio id="audio" preload="auto" style="display:none"></audio>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const post = (type, extra={})=>window.parent.postMessage({isStreamlitMessage:true,type,...extra},'*');
+const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
+const round2=v=>Math.round(v*100)/100;
+const clock=s=>{s=Math.max(0,Number(s)||0);const m=Math.floor(s/60);return `${String(m).padStart(2,'0')}:${(s%60).toFixed(2).padStart(5,'0')}`};
+let args={},regions=[],initialRegions=[],selected=null,duration=1,zoom=1,ready=false,sourceKey='',revision=0,padding=0;
+let playing=false,playMode='edited',waiting=null,raf=0,seekTime=0,drag=null,history=[];
+const audio=$('audio'),viewport=$('viewport'),track=$('track');
+function copyRegions(){return regions.map(r=>({...r}));}
+function snapshot(){history.push(copyRegions());if(history.length>70)history.shift();}
+function activeRows(){return regions.filter(r=>r.enabled);}
+function normalized(){
+ let all=activeRows().map(r=>({start:clamp(r.start-padding,0,duration),end:clamp(r.end+padding,0,duration),action:r.action_type,silence:r.silence})).sort((a,b)=>a.start-b.start);
+ let merged=[];
+ for(const r of all){let prev=merged[merged.length-1];if(prev&&r.start<=prev.end+0.00001){prev.end=Math.max(prev.end,r.end);prev.action=(prev.action==='Wytnij'||r.action==='Wytnij')?'Wytnij':'Wstaw ciszę';prev.silence=Math.max(prev.silence,r.silence)}else merged.push({...r});}
+ return merged;
+}
+function setStatus(text,kind=''){const el=$('status');el.textContent=text;el.className='status '+kind;}
+function updateDirty(){let dirty=JSON.stringify(regions)!==JSON.stringify(initialRegions);$('save').textContent=dirty?'● Zapisz wszystkie zmiany':'✓ Zaznaczenia zapisane';$('save').disabled=!dirty;const merges=normalized();$('overlaps').textContent=`${activeRows().length} aktywnych · ${merges.length} zakresów po scaleniu`;}
+function choose(id){selected=id;renderRegions();showSelection();}
+function current(){return regions.find(r=>r.ID===selected)||null;}
+function showSelection(){const r=current();$('selection').classList.toggle('hidden',!r);$('remove').disabled=!r;$('audition').disabled=!r;
+ if(!r){$('selectedTitle').textContent='Kliknij zaznaczenie, aby je edytować';return;}
+ $('selectedTitle').textContent=`#${r.ID} · ${r.category||'Ręczne'}`;$('selectedInfo').textContent=r.text||'';
+ $('start').value=r.start.toFixed(2);$('end').value=r.end.toFixed(2);$('method').value=r.action_type;$('silence').value=r.silence.toFixed(2);$('silence').disabled=r.action_type!=='Wstaw ciszę';$('active').checked=r.enabled;
+}
+function regionCSS(r,el){el.style.left=(r.start/duration*100)+'%';el.style.width=(Math.max(.01,r.end-r.start)/duration*100)+'%';el.className='region '+(r.action_type==='Wstaw ciszę'?'silence':'')+(r.enabled?'':' inactive')+(r.ID===selected?' selected':'');}
+function renderRegions(){const holder=$('regions');holder.replaceChildren();
+ for(const r of regions){const el=document.createElement('div');el.dataset.id=String(r.ID);regionCSS(r,el);const txt=document.createElement('span');txt.className='region-label';txt.textContent=`#${r.ID} ${r.category||''}`;el.appendChild(txt);
+ for(const side of ['left','right']){const handle=document.createElement('span');handle.className='handle '+side;handle.dataset.handle=side;el.appendChild(handle);}
+ el.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.stopPropagation();const mode=e.target.dataset.handle||'move';selected=r.ID;document.querySelectorAll('.region').forEach(node=>node.classList.toggle('selected',Number(node.dataset.id)===selected));showSelection();snapshot();drag={id:r.ID,mode,initialX:e.clientX,start:r.start,end:r.end,pointer:e.pointerId};el.setPointerCapture(e.pointerId);e.preventDefault();});
+ el.addEventListener('pointermove',e=>{if(!drag||drag.id!==r.ID||drag.pointer!==e.pointerId)return;const item=current();if(!item)return;const delta=(e.clientX-drag.initialX)/track.getBoundingClientRect().width*duration;
+ if(drag.mode==='move'){const len=drag.end-drag.start;item.start=round2(clamp(drag.start+delta,0,duration-len));item.end=round2(item.start+len)}
+ if(drag.mode==='left')item.start=round2(clamp(drag.start+delta,0,item.end-0.01));
+ if(drag.mode==='right')item.end=round2(clamp(drag.end+delta,item.start+0.01,duration));
+ regionCSS(item,el);showSelection();updateDirty();e.preventDefault();});
+ el.addEventListener('pointerup',e=>{if(drag&&drag.pointer===e.pointerId){drag=null;renderRegions();updateDirty()}});
+ el.addEventListener('pointercancel',()=>{drag=null;renderRegions();updateDirty()});
+ holder.appendChild(el);
+ }
+ updateDirty();}
+function drawWave(){const width=Math.max(1,Math.ceil(viewport.clientWidth*zoom));track.style.width=width+'px';const canvas=$('wave');const cssHeight=190;const resolution=Math.min(window.devicePixelRatio||1,1.5,15000/width);canvas.style.width=width+'px';canvas.style.height=cssHeight+'px';canvas.width=Math.max(1,Math.floor(width*resolution));canvas.height=Math.round(cssHeight*resolution);const ctx=canvas.getContext('2d');ctx.scale(resolution,resolution);const center=cssHeight/2;ctx.fillStyle='#0c1522';ctx.fillRect(0,0,width,cssHeight);
+ const peaks=args.peaks||[];const n=peaks.length;if(n){const bar=width/n;for(let i=0;i<n;i++){const h=Math.max(3,Number(peaks[i])*center*.84);ctx.fillStyle=(i%2?'#6fa2d9':'#91b8de');ctx.fillRect(Math.round(i*bar),center-h,Math.max(1,bar*.72),h*2);}}
+ ctx.strokeStyle='#22364a';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,center+.5);ctx.lineTo(width,center+.5);ctx.stroke();
+ const ticks=$('ticks');ticks.replaceChildren();ticks.style.width=width+'px';ticks.style.transform='translateX(-'+viewport.scrollLeft+'px)';const target=width/105;const interval=Math.max(.25,Math.pow(10,Math.floor(Math.log10(Math.max(.25,duration/target)))));let step=interval;while(duration/step>target)step*=2;for(let t=0;t<duration+.0001;t+=step){const lab=document.createElement('span');lab.className='time-mark';lab.style.left=(t/duration*100)+'%';lab.textContent=clock(t);ticks.appendChild(lab);}renderRegions();renderPlayhead();}
+function renderPlayhead(){const t=waiting?waiting.at:audio.currentTime||seekTime;$('playhead').style.left=(clamp(t,0,duration)/duration*100)+'%';$('position').textContent=clock(t)+' / '+clock(duration);}
+function stopPlayback(){playing=false;waiting=null;audio.pause();cancelAnimationFrame(raf);raf=0;setStatus('Odtwarzanie zatrzymane.');}
+function applyCuts(){if(playMode!=='edited'||!playing)return;let t=audio.currentTime;for(const r of normalized()){
+ if(t < r.start-0.008)break;
+ if(t>=r.start-0.008 && t<r.end-0.005){
+  if(r.action==='Wytnij'||r.silence<.001){audio.currentTime=clamp(r.end+.001,0,duration);seekTime=audio.currentTime;return;}
+  audio.pause();waiting={at:r.start,until:performance.now()+r.silence*1000,end:r.end};setStatus(`Podgląd: wstawiona cisza ${r.silence.toFixed(2)} s`,'success');return;
+ }
+ }
+}
+function tick(){if(!playing)return;if(waiting){if(performance.now()>=waiting.until){const end=waiting.end;waiting=null;audio.currentTime=clamp(end+.001,0,duration);audio.play().catch(()=>{stopPlayback();setStatus('Przeglądarka zablokowała dźwięk. Kliknij Odtwarzaj.','warn')});}}
+ else if(!audio.paused){applyCuts()}
+ renderPlayhead();if(audio.ended){stopPlayback();return}raf=requestAnimationFrame(tick);}
+function startPlayback(mode,at){stopPlayback();playMode=mode;const target=clamp(Number.isFinite(at)?at:audio.currentTime||0,0,Math.max(0,duration-.02));audio.currentTime=target;seekTime=target;playing=true;
+ // Evaluate the first region before playback to avoid leaking a sensitive start.
+ if(mode==='edited')applyCuts();
+ if(!waiting)audio.play().catch(()=>{stopPlayback();setStatus('Kliknij ponownie Odtwarzaj — przeglądarka odmówiła odtworzenia.','warn')});
+ setStatus(mode==='edited'?'Odtwarzanie z uwzględnieniem WSZYSTKICH aktualnych cięć.':'Odtwarzanie oryginalnego nagrania.','success');cancelAnimationFrame(raf);raf=requestAnimationFrame(tick);
+}
+function setupInputs(){for(const field of ['start','end','method','silence','active']){
+ $(field).addEventListener('change',()=>{const r=current();if(!r)return;snapshot();if(field==='start')r.start=round2(clamp(Number($('start').value),0,r.end-.01));
+ if(field==='end')r.end=round2(clamp(Number($('end').value),r.start+.01,duration));
+ if(field==='method')r.action_type=$('method').value;
+ if(field==='silence')r.silence=round2(clamp(Number($('silence').value)||0,0,30));
+ if(field==='active')r.enabled=$('active').checked;renderRegions();showSelection();});
+ }
+ $('playEdited').onclick=()=>startPlayback('edited',seekTime);
+ $('playOriginal').onclick=()=>startPlayback('original',seekTime);
+ $('pause').onclick=()=>{if(!playing){startPlayback(playMode,seekTime);return;}seekTime=waiting?waiting.at:audio.currentTime;stopPlayback();setStatus('Pauza · pozycja '+clock(seekTime));};
+ $('stop').onclick=()=>{stopPlayback();seekTime=0;audio.currentTime=0;renderPlayhead()};
+ $('audition').onclick=()=>{const r=current();if(r)startPlayback('edited',Math.max(0,r.start-2.5))};
+ $('zoom').oninput=e=>{const t=audio.currentTime||seekTime;zoom=Number(e.target.value);drawWave();viewport.scrollLeft=Math.max(0,(t/duration)*track.clientWidth-viewport.clientWidth*.3)};
+ $('zoomIn').onclick=()=>{$('zoom').value=Math.min(15,Number($('zoom').value)+1);$('zoom').dispatchEvent(new Event('input'))};
+ $('zoomOut').onclick=()=>{$('zoom').value=Math.max(1,Number($('zoom').value)-1);$('zoom').dispatchEvent(new Event('input'))};
+ $('add').onclick=()=>{snapshot();const start=round2(clamp(audio.currentTime||seekTime,0,Math.max(0,duration-.21)));const id=Math.max(0,...regions.map(r=>r.ID))+1;const r={ID:id,start,end:round2(Math.min(duration,start+.7)),enabled:true,category:'Ręczne',text:'',action_type:'Wytnij',silence:1};regions.push(r);choose(id);setStatus('Nowe zaznaczenie utworzone — przeciągnij je na osi.','success')};
+ $('remove').onclick=()=>{const r=current();if(!r)return;snapshot();regions=regions.filter(x=>x.ID!==r.ID);selected=null;renderRegions();showSelection()};
+ $('undo').onclick=()=>{if(!history.length)return;regions=history.pop();if(!current())selected=null;renderRegions();showSelection()};
+ $('save').onclick=()=>{if(regions.some(r=>!Number.isFinite(r.start)||!Number.isFinite(r.end)||r.start>=r.end)){setStatus('Popraw zakresy przed zapisem.','warn');return;}setStatus('Zapisywanie wszystkich zmian do Streamlit…','success');post('streamlit:setComponentValue',{value:{action:'save',revision,rows:regions.map(r=>({ID:r.ID,start:round2(r.start),end:round2(r.end),action_type:r.action_type,silence:round2(r.silence),enabled:r.enabled}))},dataType:'json'});};
+ track.addEventListener('pointerdown',e=>{if(e.target.closest('.region'))return;const rect=track.getBoundingClientRect();const x=clamp((e.clientX-rect.left)/rect.width,0,1);seekTime=round2(duration*x);audio.currentTime=seekTime;renderPlayhead()});
+ audio.addEventListener('loadedmetadata',()=>{if(!Number.isFinite(duration)||duration<.01)duration=audio.duration;renderPlayhead()});
+ audio.addEventListener('ended',()=>{stopPlayback();seekTime=duration;renderPlayhead()});
+ document.addEventListener('keydown',e=>{const tag=document.activeElement?.tagName;if(['INPUT','SELECT','TEXTAREA','BUTTON'].includes(tag))return;
+ if(e.key===' '){e.preventDefault();playing?$('pause').click():$('playEdited').click()}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();$('undo').click()}
+ if(e.key==='Delete'&&current())$('remove').click();
+ if((e.key==='ArrowLeft'||e.key==='ArrowRight')&&current()){e.preventDefault();snapshot();const r=current();const len=r.end-r.start;const dx=(e.key==='ArrowRight'?1:-1)*(e.shiftKey ? 0.1 : 0.01);r.start=round2(clamp(r.start+dx,0,duration-len));r.end=round2(r.start+len);renderRegions();showSelection();}
+ });
+ window.addEventListener('resize',()=>drawWave());viewport.addEventListener('scroll',()=>{$('ticks').style.transform='translateX(-'+viewport.scrollLeft+'px)';});
+}
+function render(argsNew){args=argsNew||{};if(!ready){ready=true;setupInputs();}
+ const fileKey=String(args.file_key||'')+'-'+String(args.revision||0);
+ if(fileKey!==sourceKey){stopPlayback();sourceKey=fileKey;revision=Number(args.revision||0);duration=Math.max(.1,Number(args.duration)||1);padding=clamp(Number(args.padding)||0,0,2);
+ regions=(args.rows||[]).map(r=>({ID:Number(r.ID),start:Number(r.start),end:Number(r.end),enabled:!!r.enabled,action_type:r.action_type==='Wstaw ciszę'?'Wstaw ciszę':'Wytnij',silence:clamp(Number(r.silence)||0,0,30),category:String(r.category||'Ręczne'),text:String(r.text||'')})).filter(r=>Number.isFinite(r.start)&&Number.isFinite(r.end)&&r.end>r.start);
+ initialRegions=copyRegions();selected=regions[0]?.ID??null;history=[];seekTime=0;audio.src=String(args.audio_uri||'');audio.load();zoom=1;$('zoom').value='1';drawWave();setTimeout(drawWave,100);showSelection();setStatus('Wybierz dowolne zaznaczenie i przeciągnij je. Zmiany zostaną zapisane po kliknięciu przycisku poniżej.');
+ }else if(padding!==Number(args.padding)){padding=Number(args.padding)||0;updateDirty();}
+ post('streamlit:setFrameHeight',{height:Math.ceil(document.body.scrollHeight+12)});
+}
+window.addEventListener('message',event=>{if(event.source!==window.parent)return;if(event.data?.type==='streamlit:render')render(event.data.args)});
+post('streamlit:componentReady',{apiVersion:1});
+</script>
+</body>
+</html>
