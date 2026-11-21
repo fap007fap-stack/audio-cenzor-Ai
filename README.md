@@ -1,10 +1,46 @@
-# AI Cenzor Studio
+# AI Cenzor Studio v1.3 — diagnostyka AI i poprawki Streamlit Cloud
 
 **Dopracowany prototyp Streamlit do redakcji NAGRAŃ GŁOSOWYCH (także audio zapisanych w MP4).**
 
 Wgraj nagranie → analizuj polską mowę → sprawdź propozycje cięć → zmień metodę i długość ciszy → odsłuchaj → pobierz wynik. Bez płatnego klucza API.
 
+
+## Co zmieniło się w v1.3?
+
+- Widoczny numer **1.3.0** w nagłówku i panelu bocznym, żeby odróżnić stare wdrożenie od nowego.
+- **Diagnostyka AI** pokazuje obecność Whispera, FFmpeg, opcjonalnego GLiNER2, Python i konfigurację tokenu Hugging Face.
+- **Test detektora bez nagrania** sprawdza na fikcyjnej próbce nazwisko, telefon i wulgaryzm. Nie pobiera modelu i nie testuje rozpoznawania mowy.
+- Analiza pokazuje **4 etapy** i raportuje liczbę rozpoznanych słów oraz liczbę wykryć. Dzięki temu wiadomo, czy problem dotyczy pobierania modelu, transkrypcji czy reguł.
+- Poprawione ostrzeżenia, gdy detektory nie znajdą żadnych danych.
+- Usunięte przestarzałe `use_container_width`; interfejs korzysta z `width="stretch"`.
+- Opcjonalny `HF_TOKEN` może być podany w **Streamlit Secrets**; publiczne modele nie wymagają go do działania.
+
+**To diagnostyczna poprawka, nie dowód, że każdy model działa na Streamlit Cloud.** Dodatkowy GLiNER2 nie jest częścią domyślnego `requirements.txt`, bo model może przekroczyć limity darmowej chmury. Whisper pozostaje silnikiem rozpoznawania mowy, a reguły wyszukują dane w jego wynikach.
+
+## Pierwsze kroki, gdy „AI nie działa”
+
+1. **Sprawdź wersję.** Po otwarciu aplikacji nagłówek musi pokazywać `Wersja 1.3.0`, a panel boczny `AI Cenzor Studio · 1.3.0`. Jeśli widzisz starszą, sprawdź gałąź GitHub, ścieżkę `app.py` w Streamlit oraz to, czy nowe pliki zostały zatwierdzone (**Commit**).
+2. W bocznym panelu otwórz **Diagnostyka AI / serwera**. Kliknij **Przetestuj detektor danych (bez pobierania AI)**. Test ma wykryć 3 kategorie na fikcyjnych danych.
+3. Dodaj krótki testowy MP3/MP4 z wyraźną polską mową i wybierz model `tiny` lub `base`; kliknij **Uruchom analizę nagrania**. Etapy pokażą, czy problem jest przy pobieraniu Whispera, transkrypcji czy detekcji danych.
+4. Jeśli transkrypcja ma słowa, ale wykryć jest 0, sprawdź *Sprawdź transkrypcję* oraz dodatkowe kategorie. Wersja bez GLiNER2 bazuje na regułach i nie rozpoznaje wszystkich form nazwisk.
+5. Jeśli pierwszy etap pobierania modelu kończy się błędem limitu Hugging Face, opcjonalnie dodaj token: Streamlit Cloud → **Settings → Secrets**, a następnie wpisz `HF_TOKEN = "hf_TUTAJ_WLASNY_TOKEN"`. Nie umieszczaj prawdziwego tokenu w GitHubie ani logach.
+6. Gdy aplikacja działa na Pythonie 3.14, usuń wdrożenie **w Streamlit Cloud** i wdroż repozytorium ponownie, wybierając **Python 3.12** w Advanced settings. Nie usuwaj repozytorium GitHub.
+7. Jeśli nadal jest problem, skopiuj **błąd z ekranu aplikacji po kliknięciu analizy** oraz późniejsze linie logów. Nie przesyłaj poufnych nagrań.
+
+**Uwaga:** status `Uvicorn server started` dowodzi tylko startu serwera, nie końca transkrypcji. Ostrzeżenie `HF Hub unauthenticated` samo nie blokuje dostępu do publicznego modelu.
+
 > **Ważne:** to narzędzie wspomaga usuwanie danych osobowych, ale nie gwarantuje anonimizacji. Transkrypcja i detektory mogą przeoczyć dane albo wskazać fałszywe alarmy. Obowiązkowo odsłuchaj wynik i przeprowadź ręczną kontrolę przed udostępnieniem. W przypadku poufnych nagrań używaj wdrożenia lokalnego lub własnego zabezpieczonego serwera.
+
+## Naprawa błędu `ModuleNotFoundError: No module named 'cenzor'`
+
+Ta wersja **nie korzysta z folderu `cenzor/`**. Wszystkie wymagane do uruchomienia moduły znajdują się w głównym katalogu repozytorium. Po wgraniu nowej paczki na GitHub upewnij się, że:
+
+- `app.py` i `audio_engine.py`, `detectors.py`, `quality_checks.py`, `speech.py`, `style.css` znajdują się **na tym samym poziomie**;
+- `requirements.txt` i `packages.txt` są w katalogu głównym;
+- logi uruchomienia pokazują **Python 3.12**, a nie 3.14; samo `.python-version` nie zmienia wersji w Streamlit Cloud;
+- usunięcie starego folderu `cenzor/` jest opcjonalne, ale nie pozostawiaj starego `app.py`.
+
+Szybki test po pobraniu: `python -m unittest discover -s . -p "test_*.py" -v`.
 
 ## Co potrafi
 
@@ -23,9 +59,9 @@ Wgraj nagranie → analizuj polską mowę → sprawdź propozycje cięć → zmi
 ## 1. Start na Streamlit Community Cloud (GitHub)
 
 1. Rozpakuj plik ZIP. Utwórz repozytorium na https://github.com/new (dla publicznej aplikacji kod może być publiczny, **nie umieszczaj tam nagrań**).
-2. **Wgraj zawartość rozpakowanego folderu**, nie sam ZIP: w katalogu głównym repozytorium powinny znajdować się `app.py`, `requirements.txt`, `packages.txt`, `.streamlit/`, `assets/`, `cenzor/` i `tests/`.
+2. **Wgraj zawartość rozpakowanego folderu**, nie sam ZIP: w katalogu głównym repozytorium powinny znajdować się `app.py`, `audio_engine.py`, `detectors.py`, `quality_checks.py`, `speech.py`, `style.css`, `requirements.txt` i `packages.txt` **obok siebie w katalogu głównym**. Nie ma już folderu `cenzor/`.
 3. Otwórz https://share.streamlit.io → Create app → wybierz repozytorium i gałąź `main` → Main file: **`app.py`**.
-4. W opcjach zaawansowanych wybierz **Python 3.12**, jeśli usługa udostępnia wybór wersji; kod i zależności zaprojektowano pod 3.12. Kliknij **Deploy**.
+4. W **Advanced settings** wybierz **Python 3.12**. **Plik `.python-version` nie zmienia wersji w Streamlit Community Cloud**; jeśli na logach widzisz 3.14, usuń istniejące wdrożenie w Streamlit Cloud i wdróż aplikację ponownie z wybraną 3.12. Kliknij **Deploy**.
 5. Pierwszą analizę przetestuj na **krótkim, niesekretnym pliku**. Model `base` jest domyślny, `tiny` działa z mniejszym zużyciem zasobów. Przy pierwszej analizie model zostanie pobrany przez środowisko aplikacji.
 
 `requirements.txt` wskazuje biblioteki Python, a `packages.txt` instaluje systemowy `ffmpeg` i `ffprobe`. Nie trzeba dodawać tokenu OpenAI ani klucza API. Streamlit Cloud może mieć ograniczenia pamięci i przestrzeni dyskowej; dla długich nagrań użyj komputera lokalnego.
@@ -71,13 +107,13 @@ Margines powiększa usuwane przedziały z obu stron (domyślnie po 0,12 s). Nak�
 ## 4. Jak sprawdzić, czy wszystko działa?
 
 ```bash
-python -m unittest discover -s tests -v
-python -m compileall -q app.py cenzor tests
+python -m unittest discover -s . -p "test_*.py" -v
+python -m compileall -q app.py audio_engine.py detectors.py quality_checks.py speech.py
 ```
 
 W repozytorium jest także GitHub Actions `ci.yml`, który na Linuxie i Pythonie 3.12 instaluje zależności i uruchamia testy bez potrzeby Twojej interwencji. Status CI jest obiektywną kontrolą powtarzalności wykonania kodu, **nie certyfikatem jakości anonimizacji**.
 
-Dodatkowa checklista ręczna i wymagania niezależnej oceny: [`docs/KONTROLA_JAKOSCI.md`](docs/KONTROLA_JAKOSCI.md). Opis architektury i model zagrożeń: [`docs/ARCHITEKTURA.md`](docs/ARCHITEKTURA.md).
+Dodatkowa checklista ręczna i wymagania niezależnej oceny: [`KONTROLA_JAKOSCI.md`](KONTROLA_JAKOSCI.md). Opis architektury i model zagrożeń: [`ARCHITEKTURA.md`](ARCHITEKTURA.md).
 
 ## 5. Ograniczenia i ważne informacje
 
@@ -89,24 +125,27 @@ Dodatkowa checklista ręczna i wymagania niezależnej oceny: [`docs/KONTROLA_JAK
 - Wersja nie zawiera logowania, izolowanej bazy klientów ani zgodności prawnej potwierdzonej audytem. Nie używaj jej produkcyjnie w organizacji bez oceny bezpieczeństwa.
 - Długie nagrania mogą nie mieścić się w zasobach bezpłatnego Streamlit Cloud; kod wprowadza granicę 120 min i 150 MB, lecz nie jest to gwarancja ich obsługi w chmurze.
 
-## Struktura
+## Struktura plików (wszystkie kluczowe pliki w jednym folderze)
 
 ```text
-AI_Cenzor_Studio/
-├── app.py                   # nowoczesny interfejs Streamlit
-├── assets/style.css         # styl, układ responsywny
-├── cenzor/audio.py          # FFmpeg: cięcie, cisza, walidacja, preview
-├── cenzor/detect.py         # reguły PII, imiona, telefony, własne frazy, NER
-├── cenzor/transcribe.py     # faster-whisper PL
-├── cenzor/quality.py        # raport, fingerprint, ostrzeżenia
-├── tests/                   # testy jednostkowe + integracyjne FFmpeg
-├── .github/workflows/ci.yml # automatyczna kontrola na GitHubie
-├── docs/                    # architektura, QA i ograniczenia
-├── .streamlit/config.toml
-├── .python-version          # 3.12
-├── requirements.txt
-├── requirements-ner.txt     # opcjonalny AI PII
-└── packages.txt             # ffmpeg dla Cloud
+repozytorium/
+├── app.py                 # Streamlit, plik startowy
+├── audio_engine.py        # FFmpeg: cięcia i cisza
+├── detectors.py           # wykrywanie wrażliwych fraz
+├── quality_checks.py      # podsumowanie i raport
+├── speech.py              # rozpoznawanie mowy
+├── style.css              # wygląd aplikacji
+├── requirements.txt       # zależności Python
+├── packages.txt           # FFmpeg na Streamlit Cloud
+├── test_core.py           # testy wykryć i eksportu
+├── test_studio.py         # testy integracyjne
+├── test_deployment.py     # kontrola poprawnego wgrania plików
+├── .github/workflows/     # opcjonalna automatyczna CI
+└── .streamlit/config.toml # opcjonalne ustawienia motywu
 ```
 
-Licencja MIT. Autor lub odbiorca przetwarzający dane jest odpowiedzialny za zgodność ich użycia z prawem i zasadami prywatności.
+**Najczęstszy błąd `No module named 'cenzor'`:** oznacza uruchomienie starego `app.py` lub niekompletnego repozytorium. Wersja 1.3 nie używa pakietu `cenzor`. **Wgraj i zastąp razem** `app.py`, `audio_engine.py`, `detectors.py`, `quality_checks.py`, `speech.py`, `style.css`, `requirements.txt` i `packages.txt`. Nie mieszaj modułów z wersji 1.1, 1.2 i 1.3.
+
+**Nie trzeba** kopiować do GitHuba nagrań, danych klientów ani plików `.env`. Nie publikuj plików MP3/MP4 w repozytorium.
+
+Licencja MIT. Osoba przetwarzająca dane odpowiada za zgodność ich użycia z prawem i zasadami prywatności.

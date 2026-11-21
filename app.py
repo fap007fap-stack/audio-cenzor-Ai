@@ -10,7 +10,9 @@ import hashlib
 import importlib.util
 import json
 import math
+import os
 import shutil
+import sys
 import tempfile
 from html import escape
 from pathlib import Path
@@ -18,15 +20,30 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from cenzor.audio import (
+# The processing modules live next to app.py. Explicitly include that folder so
+# Streamlit can load them consistently when deployed from GitHub.
+APP_DIR = Path(__file__).resolve().parent
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
+REQUIRED_LOCAL_FILES = ("audio_engine.py", "detectors.py", "quality_checks.py", "speech.py")
+missing_local_files = [name for name in REQUIRED_LOCAL_FILES if not (APP_DIR / name).is_file()]
+if missing_local_files:
+    st.set_page_config(page_title="AI Cenzor Studio — naprawa instalacji", layout="centered")
+    st.error("Niekompletne repozytorium: brakuje plików silnika aplikacji.")
+    st.code("\n".join(missing_local_files))
+    st.info("Wgraj do głównego katalogu repozytorium wszystkie pliki z paczki ZIP \n" 
+            "(obok app.py), zatwierdź zmiany w GitHub i uruchom aplikację ponownie.")
+    st.stop()
+
+from audio_engine import (
     Edit, audio_info, export_audio, export_excerpt, extract_audio, make_timeline,
     normalize_edits, result_duration,
 )
-from cenzor.detect import CATEGORIES, deduplicate, detect_all, gliner2_for_tokens
-from cenzor.quality import fingerprint, overlapping_pairs, redaction_report
-from cenzor.transcribe import load_model, transcribe
+from detectors import CATEGORIES, deduplicate, detect_all, gliner2_for_tokens
+from quality_checks import fingerprint, overlapping_pairs, redaction_report
+from speech import load_model, transcribe
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.3.0"
 ROOT = Path(__file__).resolve().parent
 MAX_UPLOAD_BYTES = 150 * 1024 * 1024
 EDIT_COLS = ["ID", "Zastosuj", "Od (s)", "Do (s)", "Kategoria", "Wykryty fragment",
@@ -39,8 +56,22 @@ INPUT_MIMES = {".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".mp4": "audio/mp4",
 
 st.set_page_config(page_title="AI Cenzor Studio — prywatność w nagraniach", page_icon="🎙️",
                    layout="wide", initial_sidebar_state="expanded")
-st.markdown(f"<style>{(ROOT / 'assets' / 'style.css').read_text(encoding='utf-8')}</style>",
-            unsafe_allow_html=True)
+# Public HF models do not require a token. A token stored in Streamlit Secrets
+# can optionally increase download rate limits; never display or log its value.
+if not os.environ.get("HF_TOKEN"):
+    try:
+        hf_token = st.secrets.get("HF_TOKEN")
+    except Exception:
+        hf_token = None
+    if hf_token:
+        os.environ["HF_TOKEN"] = str(hf_token)
+
+style_path = ROOT / "style.css"
+if style_path.is_file():
+    st.markdown(f"<style>{style_path.read_text(encoding='utf-8')}</style>",
+                unsafe_allow_html=True)
+else:
+    st.warning("Brakuje style.css — interfejs działa, ale bez dodatkowego stylu. Wgraj ten plik obok app.py.")
 
 
 @st.cache_resource(show_spinner="Ładowanie modelu rozpoznawania mowy…")
@@ -72,7 +103,7 @@ def reset_file_state() -> None:
         shutil.rmtree(old, ignore_errors=True)
     for key in ["workdir", "source", "file_id", "info", "rows", "tokens", "transcript",
                 "analysis_key", "revision", "output", "export_key", "preview_path", "preview_key",
-                "preview_number", "last_analysis_warnings", "verified_download"]:
+                "preview_number", "last_analysis_warnings", "verified_download", "analysis_diag"]:
         st.session_state.pop(key, None)
 
 
@@ -164,7 +195,8 @@ st.markdown('''<div class="ai-hero"><div class="ai-kicker">AUDIO PRIVACY WORKSPA
 zatwierdź precyzyjne cięcia i wybierz własną długość ciszy.</p>
 <span class="ai-pill">🎙 Tylko nagrania głosowe</span>
 <span class="ai-pill">✂ Precyzyjny montaż</span>
-<span class="ai-pill">🔒 Bez zewnętrznego API mowy</span></div>''', unsafe_allow_html=True)
+<span class="ai-pill">🔒 Bez zewnętrznego API mowy</span>
+<span class="ai-pill">🛠 Wersja 1.3.0 · diagnostyka AI</span></div>''', unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("### Ustawienia projektu")
@@ -181,7 +213,9 @@ with st.sidebar:
     use_ner = st.checkbox("Polski model PII (dodatkowy)", disabled=not ner_installed,
                           help="Wymaga instalacji requirements-ner.txt; na darmowej chmurze może zabraknąć pamięci.")
     if not ner_installed:
-        st.caption("Wersja podstawowa: Whisper + reguły. Opcjonalny GLiNER2 opisano w README.")
+        st.warning("Dodatkowy model rozpoznawania osób (GLiNER2) NIE jest zainstalowany. "
+                   "Whisper rozpoznaje mowę, a wykrywanie danych odbywa się przede wszystkim "
+                   "według reguł. Pełne rozpoznawanie nazwisk wymaga osobnego modelu.")
     additional = st.text_area("Własna lista słów i nazwisk", height=95,
                               placeholder="Jan Kowalski\nNazwa firmy\nPseudonim",
                               help="Jedna fraza w wierszu; wyszukiwane będą jej wystąpienia w transkrypcji.")
@@ -192,11 +226,29 @@ with st.sidebar:
     padding = st.slider("Margines bezpieczeństwa (s)", 0.0, 0.5, 0.12, 0.01,
                         help="Margines zostanie dodany do obu końców każdego zaznaczonego fragmentu.")
     st.divider()
-    with st.expander("Sprawdź środowisko"):
-        st.write("FFmpeg:", "Zainstalowany" if shutil.which('ffmpeg') else "BRAK")
-        st.write("FFprobe:", "Zainstalowany" if shutil.which('ffprobe') else "BRAK")
-        st.write("Model PII:", "Dostępny" if ner_installed else "Opcjonalny / brak")
-    if st.button("Usuń pliki tej sesji", use_container_width=True, key="reset"):
+    with st.expander("Diagnostyka AI / serwera", expanded=True):
+        st.caption("Testowanie środowiska bez wysyłania nagrania do zewnętrznego API.")
+        st.write("Wersja aplikacji:", APP_VERSION)
+        st.write("Python:", sys.version.split()[0])
+        st.write("Whisper (biblioteka):", "Dostępna" if importlib.util.find_spec("faster_whisper") else "BRAK — sprawdź requirements.txt")
+        st.write("FFmpeg:", "Dostępny" if shutil.which('ffmpeg') else "BRAK")
+        st.write("FFprobe:", "Dostępny" if shutil.which('ffprobe') else "BRAK")
+        st.write("Dodatkowy model PII:", "Zainstalowany" if ner_installed else "NIEZAINSTALOWANY")
+        st.write("Token HF:", "Ustawiony" if os.environ.get("HF_TOKEN") else "Brak (opcjonalny)")
+        if sys.version_info[:2] != (3, 12):
+            st.warning("Zalecany Python 3.12. Obecny interpreter może mieć inne wersje lub zgodność bibliotek.")
+        if st.button("Przetestuj detektor danych (bez pobierania AI)"):
+            demo = ["Nazywam", "się", "Jan", "Kowalski", "telefon", "501", "234", "567", "kurwa"]
+            from detectors import Token
+            synthetic = [Token(w, i * 0.4, (i + 1) * 0.4) for i, w in enumerate(demo)]
+            _, checks = detect_all(synthetic, set(CATEGORIES))
+            categories = sorted(set(f.category for f in checks))
+            if {"Imiona i nazwiska", "Numery telefonów", "Wulgaryzmy"}.issubset(categories):
+                st.success("Detektor reguł działa: nazwisko, telefon i wulgaryzm wykryte na próbce.")
+            else:
+                st.error("Test detektora nie przeszedł. Sprawdź zgodność plików z wersją 1.3.0.")
+            st.caption("Ten test NIE sprawdza Whispera ani modelu GLiNER2 i nie potwierdza skuteczności anonimizacji.")
+    if st.button("Usuń pliki tej sesji", width="stretch", key="reset"):
         reset_file_state()
         # Changing the uploader key also clears browser-side uploader state.
         st.session_state["upload_revision"] = st.session_state.get("upload_revision", 0) + 1
@@ -240,18 +292,29 @@ with st.container(border=True):
         st.markdown("**Wykrywanie w dwóch warstwach**")
         st.caption("Whisper lokalnie na serwerze aplikacji, następnie reguły i opcjonalny polski model NER. Wyniki są propozycjami.")
     with r:
-        run_analysis = st.button("Uruchom analizę nagrania", type="primary", use_container_width=True, disabled=not bool(enabled or custom_phrases))
+        run_analysis = st.button("Uruchom analizę nagrania", type="primary", width="stretch", disabled=not bool(enabled or custom_phrases))
+    if not use_ner:
+        st.info("Tryb podstawowy: Whisper + detektory regułowe. "
+                "Polski model NER jest wyłączony, więc część imion i nazwisk może nie zostać wykryta.")
     if run_analysis:
         try:
-            transcribed_wav = Path(st.session_state["workdir"]) / "do_rozpoznawania.wav"
-            with st.spinner("Przygotowywanie ścieżki audio…"):
+            with st.status("Uruchamianie analizy…", expanded=True) as status:
+                st.write("Etap 1/4: przygotowanie ścieżki audio")
+                transcribed_wav = Path(st.session_state["workdir"]) / "do_rozpoznawania.wav"
                 extract_audio(source, transcribed_wav)
-            with st.spinner("Rozpoznawanie polskiej mowy; pierwsza analiza może pobierać model…"):
-                tokens = transcribe(transcribed_wav, whisper_cached(model_size))
-            text, found = detect_all(tokens, enabled, custom_phrases)
-            if use_ner and tokens:
-                with st.spinner("Dodatkowe rozpoznawanie danych osobowych…"):
+                st.write("Etap 2/4: uruchomienie Whispera. Pierwszy raz może wymagać pobrania modelu z Hugging Face")
+                model = whisper_cached(model_size)
+                st.write("Etap 3/4: rozpoznawanie polskich słów — ten etap wykonuje się na serwerze Streamlit")
+                tokens = transcribe(transcribed_wav, model)
+                st.write(f"Rozpoznano {len(tokens)} elementów tekstu. Wyszukiwanie danych…")
+                text, found = detect_all(tokens, enabled, custom_phrases)
+                rules_count = len(found)
+                if use_ner and tokens:
+                    st.write("Etap 4/4: weryfikacja nazwisk i danych przez model GLiNER2")
                     found = deduplicate(found + gliner2_for_tokens(tokens, pii_model_cached(), enabled))
+                else:
+                    st.write("Etap 4/4: dodatkowy model GLiNER2 wyłączony lub brak tekstu")
+                status.update(label="Analiza zakończona", state="complete")
             found.sort(key=lambda f: (f.start, f.end))
             st.session_state["rows"] = [{
                 "ID": i+1, "Zastosuj": True,
@@ -264,16 +327,32 @@ with st.container(border=True):
             st.session_state["tokens"] = tokens
             st.session_state["transcript"] = text
             st.session_state["analysis_key"] = current_analysis_key
+            st.session_state["analysis_diag"] = {"tokens": len(tokens), "rules_count": rules_count,
+                                                  "total_count": len(found), "ner": bool(use_ner),
+                                                  "model": model_size}
             st.session_state["revision"] = st.session_state.get("revision", 0) + 1
             export_reset()
             st.success(f"Analiza zakończona. Wykryto {len(st.session_state['rows'])} potencjalnych fragmentów.")
             if not tokens:
-                st.warning("Whisper nie odczytał słów. Skorzystaj z ręcznego dodawania zakresów.")
+                st.warning("Whisper nie odczytał żadnych słów. Sprawdź, czy nagranie zawiera zrozumiałą "
+                           "polską mowę; spróbuj modelu 'base' lub 'small' albo dodaj zakresy ręcznie.")
+            elif not found:
+                st.warning("Whisper rozpoznał słowa, ale detektory nie znalazły zaznaczonych kategorii. "
+                           "Sprawdź tekst poniżej. Model GLiNER2 może być niezainstalowany; "
+                           "imiona zapisane małymi literami mogą umknąć regułom.")
         except Exception as exc:
-            st.error(f"Analiza się nie powiodła: {exc}")
-            st.info("Sprawdź dostępność modeli i pamięć serwera. W razie potrzeby wybierz 'tiny' lub wykonaj montaż ręcznie.")
+            st.error(f"Analiza się nie powiodła ({type(exc).__name__}): {exc}")
+            st.info("Jeśli błąd dotyczy pobierania: sprawdź internet/Hugging Face i opcjonalny "
+                    "HF_TOKEN w Secrets Streamlit. Jeśli brakuje RAM, wybierz model 'tiny'. "
+                    "Do wycinania możesz użyć ręcznych zakresów.")
     if st.session_state.get("analysis_key") != current_analysis_key and st.session_state.get("analysis_key") is not None:
         st.warning("Zmieniono kategorię, model lub własne frazy. Uruchom analizę ponownie, aby odświeżyć wykrycia.")
+    if st.session_state.get("analysis_diag"):
+        diag = st.session_state["analysis_diag"]
+        st.caption(f"Diagnostyka ostatniej analizy: model Whisper {diag['model']} · "
+                   f"rozpoznane słowa: {diag['tokens']} · detektor regułowy: {diag['rules_count']} · "
+                   f"łącznie propozycji: {diag['total_count']} · model PII: "
+                   f"{'użyty' if diag['ner'] else 'nieużyty'}")
     if "transcript" in st.session_state:
         with st.expander("Sprawdź transkrypcję (oryginalny tekst zawiera dane z rozmowy)"):
             st.text_area("Rozpoznany tekst", st.session_state["transcript"], height=175,
@@ -288,7 +367,7 @@ with st.container(border=True):
         edited = frame
     else:
         edited = st.data_editor(
-            frame, hide_index=True, use_container_width=True, num_rows="fixed",
+            frame, hide_index=True, width="stretch", num_rows="fixed",
             key=f"editor_{st.session_state.get('revision', 0)}",
             disabled=["ID", "Kategoria", "Wykryty fragment", "Źródło", "Pewność"],
             column_config={
@@ -319,7 +398,7 @@ with st.container(border=True):
                 add_silence = st.number_input("Cisza (s)", 0.0, 30.0, float(default_silence), 0.25, format="%.2f")
             with p5:
                 add_label = st.text_input("Opis (opcjonalnie)", placeholder="np. nazwisko klienta")
-            if st.form_submit_button("Dodaj do edytora", use_container_width=True):
+            if st.form_submit_button("Dodaj do edytora", width="stretch"):
                 if not (0 <= add_start < add_end <= duration + 0.02):
                     st.error("Podaj przedział wewnątrz nagrania z końcem większym od początku.")
                 else:
@@ -369,7 +448,7 @@ with st.container(border=True):
                 end_at = start_at + 45
                 st.caption("Podgląd ograniczony do 45 sekund.")
             sample_key = fingerprint([st.session_state["file_id"], start_at, end_at])
-            if st.button("Odsłuchaj ±2 s wokół wykrycia", use_container_width=True):
+            if st.button("Odsłuchaj ±2 s wokół wykrycia", width="stretch"):
                 try:
                     sample_path = Path(st.session_state["workdir"]) / "odsluch_fragmentu.mp3"
                     export_excerpt(source, sample_path, start_at, end_at, duration)
@@ -396,7 +475,7 @@ with st.container(border=True):
     disabled = not valid or not edits or (st.session_state.get("analysis_key") not in (None, current_analysis_key))
     if not edits and valid:
         st.info("Zaznacz co najmniej jeden przedział, aby przygotować oczyszczone nagranie.")
-    if st.button("Wygeneruj oczyszczony plik", type="primary", use_container_width=True, disabled=disabled):
+    if st.button("Wygeneruj oczyszczony plik", type="primary", width="stretch", disabled=disabled):
         try:
             dest = Path(st.session_state["workdir"]) / ("AI_Cenzor_Studio_wynik" + suffix)
             with st.spinner("FFmpeg wycina fragmenty i składa nowy plik audio…"):
@@ -421,11 +500,11 @@ with st.container(border=True):
             with d1:
                 st.download_button("Pobierz gotowe nagranie", data=path.read_bytes(),
                                    file_name=path.name, mime=mime, disabled=not accept,
-                                   type="primary", use_container_width=True)
+                                   type="primary", width="stretch")
             with d2:
                 report = redaction_report(edits, duration, padding, output_duration=estimated_duration, format_name=format_name)
                 st.download_button("Pobierz raport JSON", data=report,
-                                   file_name="AI_Cenzor_raport.json", mime="application/json", use_container_width=True)
+                                   file_name="AI_Cenzor_raport.json", mime="application/json", width="stretch")
 
 st.markdown('<div class="ai-footer">AI Cenzor Studio · Twój dźwięk, Twoja decyzja · '
             'Bez automatycznego publikowania nagrań · 2026</div>', unsafe_allow_html=True)
