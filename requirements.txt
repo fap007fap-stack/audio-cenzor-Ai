@@ -1,0 +1,8 @@
+# Komplet zależności do Streamlit Community Cloud / Python 3.12
+# Uwaga: PyAV 19 + starszy faster-whisper powodował metadata_errors.
+# Mimo że nowy kod omija dekoder PyAV, pin zapewnia zgodność zależności.
+streamlit>=1.49,<2
+pandas>=2.2,<3
+numpy>=1.26,<3
+faster-whisper==1.2.1
+av==18.1.0
